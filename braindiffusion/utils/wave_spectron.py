@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt
 
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 
 try:
     import librosa  # noqa: E402
@@ -187,7 +187,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             # print(mel_spec.shape)
 
         # Stack the mel-spectrograms along the third axis to create a tensor
-        mel_specs = np.stack(mel_specs, axis=0).transpose(0, 2, 1)
+        mel_specs = - np.stack(mel_specs, axis=0).transpose(0, 2, 1)
 
         return mel_specs
     
@@ -229,7 +229,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             # print(mel_spec.shape)
 
         # Stack the mel-spectrograms along the third axis to create a tensor
-        mel_specs = np.stack(mel_specs, axis=0).reshape(self.batch_size, self.eeg_channels, self.n_mels, -1).transpose(0, 1, 3, 2)
+        mel_specs = - np.stack(mel_specs, axis=0).reshape(self.batch_size, self.eeg_channels, self.n_mels, -1).transpose(0, 1, 3, 2)
 
         return mel_specs
 
@@ -260,7 +260,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             mel_specs.append(log_S)
 
         # Stack the mel-spectrograms along the third axis to create a tensor
-        mel_specs = np.stack(mel_specs, axis=0).transpose(0, 2, 1)
+        mel_specs = - np.stack(mel_specs, axis=0).transpose(0, 2, 1)
 
         return mel_specs
     
@@ -291,7 +291,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             mel_specs.append(log_S)
 
         # Stack the mel-spectrograms along the third axis to create a tensor
-        mel_specs = np.stack(mel_specs, axis=0).reshape(self.batch_size, self.eeg_channels, self.n_mels, -1).transpose(0, 1, 3, 2)
+        mel_specs = - np.stack(mel_specs, axis=0).reshape(self.batch_size, self.eeg_channels, self.n_mels, -1).transpose(0, 1, 3, 2)
 
         return mel_specs
     
@@ -318,6 +318,33 @@ class Spectro(ConfigMixin, SchedulerMixin):
 
         return np.stack(waves, axis=0).reshape(self.batch_size, self.eeg_channels, -1)
     
+    def single_wave_to_latent(self, wave: np.ndarray) -> np.ndarray:
+        """Converts wave to spectrogram.
+        Args:
+            wave (`np.ndarray`): raw wave   
+        Returns:
+            wave (`np.ndarray`): raw wave
+        """
+        # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
+        y = wave.reshape(self.eeg_channels, -1)
+        # Define a function to compute the mel-spectrogram for a single channel
+        # Initialize a list to store the mel-spectrogram futures for each channel
+        mel_specs = []
+
+        for i in range(y.shape[0]):
+            # compute the mel-spectrogram for the i-th channel
+            S = librosa.feature.melspectrogram(y=y[i],  sr=self.sr, n_fft=self.n_fft, hop_length=self.hop_length, n_mels=self.n_mels)
+            # convert power spectrogram to dB-scaled spectrogram
+            log_S = librosa.power_to_db(S, ref=np.max)
+            # append the mel-spectrogram to the list
+            # log_S = S
+            mel_specs.append(log_S)
+
+        # Stack the mel-spectrograms along the third axis to create a tensor
+        mel_specs = - np.stack(mel_specs, axis=0).reshape(self.eeg_channels, self.n_mels, -1).transpose(0, 2, 1)
+
+        return mel_specs
+    
     def single_latent_to_wave(self, latent: np.ndarray) -> np.ndarray:
         """Converts spectrogram to wave.
 
@@ -328,7 +355,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             wave (`np.ndarray`): raw wave
         """
         # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
-        latent = latent.transpose(0, 2, 1)
+        latent = - latent.transpose(0, 2, 1)
         log_spectrogram = latent.reshape(self.eeg_channels, self.n_mels, -1)
         waves = []
         for i in range(log_spectrogram.shape[0]):

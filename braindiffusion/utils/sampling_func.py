@@ -34,10 +34,9 @@ def invert_waveform(waveform_scaled, n, max_sampledepth=255):
     return:
     A waveform of shape (bs, 22, 750) with amplitudes in the range [-n, n].
     """
-    # 将波形值从 [0, max_sampledepth] 映射到 [0, 1]
     waveform_normalized = waveform_scaled.astype(np.float32) / max_sampledepth
     
     # 将波形值从 [0, 1] 映射到 [-n, n]
-    waveform = waveform_normalized * (2 * n) - n
+    waveform = waveform_normalized * (4 * n)
     
     return waveform

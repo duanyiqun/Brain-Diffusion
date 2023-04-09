@@ -24,15 +24,33 @@ ______________________________________________________________________
 
 Please install required pip packages
 ```ssh
-pip install tensorboardx
-pip install labml
-pip install scikit-learn
-pip install torch torchvision
+pip install transformers==4.27.1
+pip install diffuser 
+```
+If warning of any unfound versions , just install the latest version with conda. Also recommend to use newer version of transformers 
+
+
+```sh
+git clone https://github.com/duanyiqun/Brain-Diffusion.git
+cd Brain-Diffusion
+pip install -e .
 pip instlal -r requirements.txt
 ```
-If warning of any unfound versions , just install the latest version with conda.
 
 
+## Data Preparation
+
+Download the BCI-IV data under the dataset folder (apply for liscence). The data is from [here](https://www.bbci.de/competition/iv/#dataset2). The data should be preprossed in .mat format. We provide example file of a single subject. 
+
+This step convert the EEG waves into spectro latent and create a dataset for accelerate the training. This convertion is inspired by in audio conversion. To accelerate the conversion we use the mel spectro from audio area. 
+
+```sh
+python scripts/wave2spectro.py \
+        --resolution 31,64 \
+        --hop_length 50 \
+        --input_dir path-to-mat-files \
+        --output_dir path-to-output-data
+```
 
 ## Training
 

@@ -27,7 +27,7 @@ from diffusers import (
 from diffusers.utils import BaseOutput
 from PIL import Image
 
-from .mel import Mel
+from braindiffusion.utils.wave_spectron import Spectro
 
 class WaveDiffusionPipeline(DiffusionPipeline):
     """
@@ -47,11 +47,11 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         self,
         vqvae: AutoencoderKL,
         unet: UNet2DConditionModel,
-        mel: Mel,
+        Spectro: Spectro,
         scheduler: Union[DDIMScheduler, DDPMScheduler],
     ):
         super().__init__()
-        self.register_modules(unet=unet, scheduler=scheduler, mel=mel, vqvae=vqvae)
+        self.register_modules(unet=unet, scheduler=scheduler, Spectro=Spectro, vqvae=vqvae)
 
     def get_input_dims(self) -> Tuple:
         """Returns dimension of input image

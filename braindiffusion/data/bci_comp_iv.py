@@ -173,8 +173,8 @@ class DatasetLoader_BCI_IV_mix_subjects(torch.utils.data.Dataset):
         # self.converter.load_wave(raw_wave=train_x)
         # train_x = self.converter.wave_to_latent_multitr()
         # print("The shape of sample x0 is {}".format(test_x[0][1]))
-        self.converter.load_wave(raw_wave=test_x)
-        test_x = self.converter.wave_to_latent_multitr()
+        # self.converter.load_wave(raw_wave=test_x)
+        # test_x = self.converter.wave_to_latent_multitr()
         
         ratio = 0.5
         idx = list(range(len(test_y)))
@@ -182,12 +182,12 @@ class DatasetLoader_BCI_IV_mix_subjects(torch.utils.data.Dataset):
         test_win_x = test_x[idx]
         test_win_y = test_y[idx]
 
-        idx = list(range(len(test_win_y)))
+        idx = list(range(len(train_y)))
         np.random.shuffle(idx)
         train_x = train_x[idx]
         train_y = train_y[idx]
 
-        val_win_x = test_win_x[:int(len(test_win_x)*0.5), :, :, :].astype('float32')
+        val_win_x = test_win_x[:int(len(test_win_x)*0.5), :, :].astype('float32')
         val_win_y = test_win_y[:int(len(test_win_x)*0.5)]
 
         real_test_win_x = test_win_x[int(len(test_win_x)*0.5):, :, :].astype('float32')
@@ -195,6 +195,7 @@ class DatasetLoader_BCI_IV_mix_subjects(torch.utils.data.Dataset):
 
         if setname == 'train':
             self.data = train_x
+            # print("the shape of train data is {}".format(train_x.shape))
             self.label = train_y
         elif setname == 'val':
             self.data = val_win_x
@@ -242,9 +243,11 @@ if __name__ == '__main__':
     # print(dataset[0][0].shape)
     # print(dataset[0][1])
 
-    dataset = datasetLoader_BCI_IV_mix_subjects_test()
+    dataset = datasetLoader_BCI_IV_mix_subjects()
     print(dataset[0][0].shape)
-    print(dataset[0][0][1])
+    # print(dataset[0][0][1])
+
+    """
     dataset.converter.plot_spectrogram(-dataset[0][0][0], save_fig='./test.png')
 
     pos_count = np.count_nonzero(np.sign(dataset[0][0][1]) == 1)
@@ -256,15 +259,16 @@ if __name__ == '__main__':
     print(dataset.data.shape)
     waves = dataset.converter.single_latent_to_wave(np.array(dataset[0][0]))
 
-    """
+    
+    todo: figure out why we need to use -dataset[0][0] to get the correct waveform
     power_to_db 函数将功率谱转换为分贝 (dB) 谱。由于功率谱的单位是平方的振幅，因此其值可以是任何非负数。
     而分贝的定义是基于对数的，所以分贝谱的值可以是正数或负数，其中 0 dB 表示参考功率或振幅，而负数则表示相对于参考功率或振幅的衰减。
     因此，对于某些音频信号，特别是低频信号，power_to_db 可能会返回负值。
     这是因为低频信号具有较高的振幅，但其功率却相对较低，所以需要使用负值来表示分贝谱的相对幅度。
-    """
-    
     
 
     # waves = sampling_func.invert_waveform(waves, dataset.wave_max, dataset.max_sampledepth)
     # print(waves.shape)
-    print(waves[0]*25)
+    waves = sampling_func.invert_waveform(waves, 100, 255)
+    print(waves[0])
+    """
