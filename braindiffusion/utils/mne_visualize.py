@@ -40,11 +40,6 @@ def visualize_eeg1020(data, sample_rate=250, duration=3, n_channels=22):
     return pil_image, pil_image_raw
 
 
-
-
-
-
-
 if __name__ == '__main__':
     data = np.random.rand(22, 1550)
     pil_image, pil_image_raw = visualize_eeg1020(data)

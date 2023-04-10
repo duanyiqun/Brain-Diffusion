@@ -37,6 +37,11 @@ pip install -e .
 pip instlal -r requirements.txt
 ```
 
+<div align="center">
+
+## Base Diffusion (BCI-IV Dataset)
+------------------------------------------------------------------------
+</div>
 
 ## Data Preparation
 
@@ -51,8 +56,10 @@ python scripts/wave2spectro.py \
         --input_dir path-to-mat-files \
         --output_dir path-to-output-data
 ```
+ 
 
 ## Training
+
 
 The training entry scripts:
 ```bash
@@ -73,32 +80,66 @@ If you want use wandb to log metrics on webiste first run init
 wandb login
 ```
 
-## Inference
 
-Please config args as below as you training file give. Also set the runid to your trained checkpoints folder. Given the example below please set ```runid=34854f3ed38711edb808e4434b7714aa``` A sample structure under the log/experiment_name folder could be:
+You can switch between logging in tensorboard or wandb by modify the accelerator config file. The default generator is wandb. The project name could be modified by given additional args ```--wandb_projects```. 
+The visualization of the image is saved locally to prevent breaking the training process. The visualization of the training process could be found in modesl/name/visualization file. The saving interval could be modified by ```--save_images_epochs```. 
+Here are examples of the visualization, mainly include the spectrogram, and the reconstructed wave.
 
-```sh
-.
-└── 34854f3ed38711edb808e4434b7714aa
-    ├── checkpoints
-    ├── configs.yaml
-    ├── indicators.yaml
-    ├── pids
-    ├── run.yaml
-    ├── source.diff
-    └── wandb
-```
-
-The inference entry scripts:
-```bash
-python sample_save.py
-```
-
-
-The generated example of denoised EEG signals (blue) with separated noise (green). This method may also be used for other time sequence signals. Below is a sampled animation of the generated process of sampling sythetic EEG signals from noise given random noise and subjects. The noise decrease through time steps. The clean signal then rapidly take the lead of the whole process. 
 
 <div align="center">
 <img style="border-radius: 0.3125em;
-    box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  src=./visualization/noise_curve_animate_subject_[0].gif width = "400" alt="图片名称" align=center /> <img style="border-radius: 0.3125em;
-    box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  src=./visualization/noise_curve_animate_subject_[1].gif width = "400" alt="图片名称" align=center />
+    box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  src=./visualization/vismel_bci_iv.png width = "200" alt="图片名称" align=center /> <img style="border-radius: 0.3125em;
+    box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  src=./visualization/psd_mapwave_97.png width = "570" alt="图片名称" align=center />
+</br>
 </div>
+
+
+<div align="center">
+</br>
+
+## Conditioned Latent Diffusion (Zuco Dataset)
+------------------------------------------------------------------------
+</div>
+
+
+## Data Preparation
+
+* Download raw data from ZuCo
+  * Download ZuCo v1.0 for 'task1-SR','task2-NR','task3-TSR' from https://osf.io/q3zws/files/ under 'OSF Storage' root,
+  unzip and move all .mat files to /dataset/ZuCo/task1-SR/Matlab_files,/dataset/ZuCo/task2-NR/Matlab_files,/dataset/ZuCo/task3-TSR/Matlab_files respectively.
+  * Download ZuCo v2.0 'Matlab files' for 'task1-NR' from https://osf.io/2urht/files/ under 'OSF Storage' root, unzip and move all .mat files to /dataset/ZuCo/task2-NR-2.0/Matlab_files.
+* Preparation scripts for eye fixation sliced data
+  * Modify the data paths and roots in [construct_wave_mat_to_pickle_v1.py](util/construct_dataset_mat_to_pickle_v1.py) and [construct_wave_mat_to_pickle_v2.py](util/construct_dataset_mat_to_pickle_v2.py)
+  * Run [scripts/data_preparation_freq.sh](scripts/data_preparation_freq.sh) for eye-tracking fixation sliced EEG waves. 
+* Preparation scripts for raw waves
+  * Modify the roots variable in  [scripts/data_preparation_wave.sh](scripts/data_preparation_wave.sh) and run the scripts, -r suggest the source root, -o denotes the output notes
+  ```python3 
+  ./util/construct_wave_mat_to_pickle_v1.py -t task3-TSR -r /projects/CIBCIGroup/00DataUploading/yiqun/bci -o /projects/CIBCIGroup/00DataUploading/yiqun/bci/ZuCo/dewave_sent
+  ```
+  The processed data will be saved in the output root. An direction of this root is like this:
+  ```sh
+  .
+  └── ZuCo
+      ├── task1-SR
+      │   └── pickle
+      │       └── task1-SR-dataset.pickle
+      ├── task2-NR
+      │   └── pickle
+      │       └── task2-NR-dataset.pickle
+      ├── task2-NR-2.0
+      │   └── pickle
+      │       └── task2-NR-2.0-dataset.pickle
+      └── task3-TSR
+          └── pickle
+              └── task3-TSR-dataset.pickle
+  ```
+
+
+
+* Generate Spectros: Please note this may cost 80G memory. If you have enough memory, you can run the following command to generate spectrograms. Or you may modify the code to generate spectrograms each time for a split by comment out data parts in [scripts/wave2spectro_zuco.py](scripts/wave2spectro_zuco.py).
+  ```sh 
+  python scripts/wave2spectro_zuco.py --resolution 96,96 --input_dir path-to-preprocessed-zuco --output_dir path-to-output-data --hop_length 75 --sample_rate 500 --n_fft 100
+  ```
+
+## Training
+

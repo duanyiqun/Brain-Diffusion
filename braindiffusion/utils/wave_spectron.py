@@ -21,6 +21,7 @@ warnings.filterwarnings("ignore")
 
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt
+from scipy.signal import stft, istft
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 
@@ -458,14 +459,187 @@ class Spectro(ConfigMixin, SchedulerMixin):
     
     def get_sample_rate(self):
         return self.sr
-        
     
+    
+class Spectro_STFT(ConfigMixin, SchedulerMixin):
+    """
+    Parameters:
+        x_res (`int`): x resolution of spectrogram (time)
+        y_res (`int`): y resolution of spectrogram (frequency bins)
+        sample_rate (`int`): sample rate of wave
+        n_fft (`int`): number of Fast Fourier Transforms
+        hop_length (`int`): hop length (a higher number is recommended for lower than 256 y_res)
+        top_db (`int`): loudest in decibels
+        n_iter (`int`): number of iterations for Griffin Linn mel inversion
+    """
+
+    config_name = "spectro_config.json"
+
+    @register_to_config
+    def __init__(
+        self,
+        x_res: int = 16,
+        y_res: int = 51, # delta (0.5-4Hz), theta (4-8 Hz), alpha (8-14 Hz), beta (14-30Hz) and gamma (above 30Hz)
+        sample_rate: int = 250, # 250hz for MI 500hz for reading
+        n_fft: int = 100, # time window
+        hop_length: int = 50, # time step
+        top_db: int = 50, 
+        n_iter: int = 32,
+        eeg_channels : int = 22, 
+    ):
+        self.hop_length = hop_length
+        self.sr = sample_rate
+        self.n_fft = n_fft
+        self.top_db = top_db
+        self.n_iter = n_iter
+        self.set_resolution(x_res, y_res)
+        self.wave = None
+        self.eeg_channels = eeg_channels
+        self.batch_size = None
+        self.window = "hann"
+
+        if not _librosa_can_be_imported:
+            raise ValueError(_import_error)
+
+    def set_resolution(self, x_res: int, y_res: int):
+        """Set resolution.
+
+        Args:
+            x_res (`int`): x resolution of spectrogram (time)
+            y_res (`int`): y resolution of spectrogram (frequency bins)
+        """
+        self.x_res = x_res
+        self.y_res = y_res
+        self.n_mels = self.y_res
+        self.slice_size = self.x_res * self.hop_length - 1
+
+    def load_wave(self, wave_file: str = None, raw_wave: np.ndarray = None):
+        """Load wave.
+
+        Args:
+            wave_file (`str`): must be a file on disk due to Librosa limitation or
+            raw_wave (`np.ndarray`): wave as numpy array
+        """
+        if wave_file is not None:
+            # self.wave, _ = librosa.load(wave_file, mono=True, sr=self.sr)
+            raise ValueError(_import_error)
+            print("load from file is not supported at this version")
+        else:
+            self.wave = raw_wave
+        
+        self.batch_size = self.wave.shape[0]
+        assert self.eeg_channels == self.wave.shape[1]
+        self.sample_len = self.wave.shape[2]
+
+        # Pad with silence if necessary.
+        if self.sample_len < self.x_res * self.hop_length:
+            # print(len(self.wave))
+            # print("required lenght {}".format(self.x_res * self.hop_length))
+            # print("padding with shape {}".format(np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length -(self.sample_len))).shape))
+            # self.wave = np.concatenate([self.wave, np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length - self.sample_len))])
+            self.wave = np.concatenate([self.wave, np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length - self.sample_len))], axis=2)
+
+    def get_number_of_channels(self) -> int:
+        """Get number of slices in wave.
+
+        Returns:
+            `int`: number of spectograms wave can be sliced into
+        """
+        return self.wave.shape[1]
+
+    def get_wave_channel(self, slice: int = 0) -> np.ndarray:
+        """Get slice of wave.
+
+        Args:
+            slice (`int`): slice number of wave (out of get_number_of_slices())
+
+        Returns:
+            `np.ndarray`: wave as numpy array
+        """
+        return self.wave[:slice:]
+    
+    def single_wave_to_latent(self, wave: np.ndarray) -> np.ndarray:
+        """Converts wave to spectrogram.
+        Args:
+            wave (`np.ndarray`): raw wave   
+        Returns:
+            wave (`np.ndarray`): raw wave
+        """
+        # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
+        y = wave.reshape(self.eeg_channels, -1)
+        # Define a function to compute the mel-spectrogram for a single channel
+        # Initialize a list to store the mel-spectrogram futures for each channel
+        mel_specs = []
+
+        for i in range(y.shape[0]):
+            # compute the mel-spectrogram for the i-th channel
+            _, _, S = stft(y[i], nperseg=self.n_fft, noverlap=self.hop_length, window=self.window)
+            # convert power spectrogram to dB-scaled spectrogram
+            # log_S = librosa.power_to_db(S, ref=np.max)
+            # append the mel-spectrogram to the list
+            # log_S = S
+            mel_specs.append(S)
+            # print(S.shape)
+
+        # Stack the mel-spectrograms along the third axis to create a tensor
+        mel_specs = np.stack(mel_specs, axis=0).reshape(self.eeg_channels, self.n_mels, -1).transpose(0, 2, 1)
+
+        return mel_specs
+    
+    def single_latent_to_wave(self, latent: np.ndarray) -> np.ndarray:
+        """Converts spectrogram to wave.
+
+        Args:
+            image (`PIL Image`): x_res x y_res grayscale image
+
+        Returns:
+            wave (`np.ndarray`): raw wave
+        """
+        latent = latent.transpose(0, 2, 1)
+        # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
+        scale_factor = [1] * len(latent[0])
+        X_rec = []
+        for x_stft, scale_factor in zip(latent, scale_factor):
+            x_rec = istft(x_stft, nperseg=self.n_fft, noverlap=self.hop_length, window=self.window)[1]
+            X_rec.append(x_rec * scale_factor)
+            print(x_rec)
+
+        return np.stack(X_rec, axis=0).reshape(self.eeg_channels, -1)
+    
+
+    def plot_spectrogram(self, latent, save_fig="./braindiffusion/visualization/spectrogram.png", channel_index=0):
+        # Compute the spectrogram
+        spectrogram = np.abs(latent).transpose(1,0)
+        
+        # Plot the spectrogram
+        fig, ax = plt.subplots(figsize=(8, 8))
+        im = ax.imshow(spectrogram, cmap='hot', origin='lower')
+        ax.set_ylabel('Frequency')
+        ax.set_xlabel('Time')
+        ax.set_title('Spectrogram with channel {}'.format(channel_index))
+        fig.colorbar(im, ax=ax)
+        
+        # Save the plot as an image
+        if save_fig is not None:
+            plt.savefig(save_fig)
+        
+        # Convert the plot to a PIL image and return it
+        fig.canvas.draw()
+        image = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        return image
+    
+    def get_sample_rate(self):
+        return self.sr
+      
 
 if __name__ == "__main__":
     print("test start")
-    sample_wave = np.random.rand(2, 22, 750)
-    sample_latent = np.random.rand(22, 32, 64)
-    converter = Spectro()
+    # sample_wave = np.random.rand(2, 22, 750)
+    # sample_latent = np.random.rand(22, 32, 64)
+    sample_wave = np.random.rand(2, 105, 8350)
+    sample_latent = np.random.rand(105, 112, 96)
+    ### test spectrogram
+    converter = Spectro(x_res=96, y_res=96, sample_rate=500, n_fft=100, hop_length=75, eeg_channels=105)
     converter.load_wave(raw_wave=sample_wave)
     print(converter.wave.shape)
     print(converter.get_number_of_channels())
@@ -482,4 +656,17 @@ if __name__ == "__main__":
     print(sample_wave)
     print(converter.single_latent_to_wave(sample_latent).shape)
     # print(sample_wave-inversed_wave[:,:,:750])
-    
+
+    ### test spectrogram stft
+    """
+    sample_wave = np.random.rand(2, 22, 750)
+    sample_latent = np.random.rand(22, 16, 51)
+    converter = Spectro_STFT()
+    converter.load_wave(raw_wave=sample_wave)
+    print(converter.wave.shape)
+    print(converter.single_wave_to_latent(sample_wave[0]).shape)
+    print(converter.single_latent_to_wave(sample_latent).shape)
+    print(converter.get_sample_rate())
+    print(converter.get_number_of_channels())
+    print(converter.plot_spectrogram(converter.single_wave_to_latent(sample_wave[0])[0],save_fig='./test.png').size)
+    """
