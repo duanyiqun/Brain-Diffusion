@@ -56,7 +56,17 @@ python scripts/wave2spectro.py \
 
 The training entry scripts:
 ```bash
-python unet2d_overlap.py
+accelerate launch --config_file config/accelerate_local.yaml \
+scripts/train_unet.py \
+    --dataset_name dataset/bci_iv/spectro_dp \
+    --hop_length 50 \
+    --output_dir models/spectro_dp-3264 \
+    --train_batch_size 2 \
+    --num_epochs 100 \
+    --gradient_accumulation_steps 1 \
+    --learning_rate 1e-4 \
+    --lr_warmup_steps 500 \
+    --mixed_precision no
 ```
 If you want use wandb to log metrics on webiste first run init 
 ```bash

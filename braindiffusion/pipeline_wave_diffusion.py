@@ -28,6 +28,8 @@ from diffusers.utils import BaseOutput
 from PIL import Image
 
 from braindiffusion.utils.wave_spectron import Spectro
+from braindiffusion.utils.mne_visualize import visualize_eeg1020
+from braindiffusion.utils.sampling_func import *
 
 class WaveDiffusionPipeline(DiffusionPipeline):
     """
@@ -37,7 +39,7 @@ class WaveDiffusionPipeline(DiffusionPipeline):
     Parameters:
         vqae ([`AutoencoderKL`]): Variational AutoEncoder for Latent wave Diffusion or None
         unet ([`UNet2DConditionModel`]): UNET model
-        mel ([`Mel`]): transform wave <-> spectrogram
+        Spectro ([`Spectro`]): transform wave <-> spectrogram
         scheduler ([`DDIMScheduler` or `DDPMScheduler`]): de-noising scheduler
     """
 
@@ -97,7 +99,7 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         Union[AudioPipelineOutput, ImagePipelineOutput],
         Tuple[List[Image.Image], Tuple[int, List[np.ndarray]]],
     ]:
-        """Generate random mel spectrogram from wave input and convert to wave.
+        """Generate random Spectro spectrogram from wave input and convert to wave.
 
         Args:
             batch_size (`int`): number of samples to generate
@@ -116,7 +118,7 @@ class WaveDiffusionPipeline(DiffusionPipeline):
             return_dict (`bool`): if True return wavePipelineOutput, ImagePipelineOutput else Tuple
 
         Returns:
-            `List[PIL Image]`: mel spectrograms (`float`, `List[np.ndarray]`): sample rate and raw waves
+            `List[PIL Image]`: Spectro spectrograms (`float`, `List[np.ndarray]`): sample rate and raw waves
         """
 
         steps = steps or self.get_default_steps()
@@ -126,14 +128,14 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         if type(self.unet.sample_size) == int:
             self.unet.sample_size = (self.unet.sample_size, self.unet.sample_size)
         input_dims = self.get_input_dims()
-        self.mel.set_resolution(x_res=input_dims[1], y_res=input_dims[0])
+        self.Spectro.set_resolution(x_res=input_dims[1], y_res=input_dims[2])
         if noise is None:
             noise = torch.randn(
                 (
                     batch_size,
                     self.unet.in_channels,
-                    self.unet.sample_size[0],
                     self.unet.sample_size[1],
+                    self.unet.sample_size[2],
                 ),
                 generator=generator,
                 device=self.device,
@@ -142,8 +144,8 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         mask = None
 
         if wave_file is not None or raw_wave is not None:
-            self.mel.load_wave(wave_file, raw_wave)
-            input_image = self.mel.wave_slice_to_image(slice)
+            self.Spectro.load_wave(raw_wave=raw_wave)
+            input_image = self.Spectro.wave_slice_to_image(slice)
             input_image = np.frombuffer(input_image.tobytes(), dtype="uint8").reshape(
                 (input_image.height, input_image.width)
             )
@@ -160,10 +162,10 @@ class WaveDiffusionPipeline(DiffusionPipeline):
                 images[0, 0] = self.scheduler.add_noise(input_images, noise, self.scheduler.timesteps[start_step - 1])
 
             pixels_per_second = (
-                self.unet.sample_size[1] * self.mel.get_sample_rate() / self.mel.x_res / self.mel.hop_length
+                self.unet.sample_size[1] * self.Spectro.get_sample_rate() / self.Spectro.x_res / self.Spectro.hop_length
             )
-            mask_start = int(mask_start_secs * pixels_per_second)
-            mask_end = int(mask_end_secs * pixels_per_second)
+            # mask_start = int(mask_start_secs * pixels_per_second)
+            # mask_end = int(mask_end_secs * pixels_per_second)
             mask = self.scheduler.add_noise(input_images, noise, torch.tensor(self.scheduler.timesteps[start_step:]))
 
         for step, t in enumerate(self.progress_bar(self.scheduler.timesteps[start_step:])):
@@ -199,18 +201,21 @@ class WaveDiffusionPipeline(DiffusionPipeline):
             images = 1 / 0.18215 * images
             images = self.vqvae.decode(images)["sample"]
 
-        images = (images / 2 + 0.5).clamp(0, 1)
-        images = images.cpu().permute(0, 2, 3, 1).numpy()
-        images = (images * 255).round().astype("uint8")
-        images = list(
-            map(lambda _: Image.fromarray(_[:, :, 0]), images)
-            if images.shape[3] == 1
-            else map(lambda _: Image.fromarray(_, mode="RGB").convert("L"), images)
-        )
+        images = (images / 2 + 0.5).clamp(0, 1) # 2,22,32,64
+        images = images.cpu().numpy()
+        channels = images.shape[1]
+        # images = (images * 255).round().astype("uint8")
+        # select bs 1 for visualization 22 channels
+        spec_images = []
+        for channel_index in range(channels):
+            spec_images.append(self.Spectro.plot_spectrogram(latent=images[0][channel_index], save_fig=None, channel_index=channel_index))
 
-        waves = list(map(lambda _: self.mel.image_to_wave(_), images))
+        # for channel_index in range():
+        wave = self.Spectro.single_latent_to_wave(latent=images[0])
+        pil_psd, pil_raw = visualize_eeg1020(wave, self.Spectro.get_sample_rate(), n_channels=22)
+        
         if not return_dict:
-            return images, (self.mel.get_sample_rate(), waves)
+            return spec_images, (self.Spectro.get_sample_rate(), [pil_psd, pil_raw])
 
         return BaseOutput(**wavePipelineOutput(np.array(waves)[:, np.newaxis, :]), **ImagePipelineOutput(images))
 

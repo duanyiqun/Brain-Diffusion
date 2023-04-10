@@ -111,8 +111,8 @@ class Spectro(ConfigMixin, SchedulerMixin):
         # Pad with silence if necessary.
         if self.sample_len < self.x_res * self.hop_length:
             # print(len(self.wave))
-            print("required lenght {}".format(self.x_res * self.hop_length))
-            print("padding with shape {}".format(np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length -(self.sample_len))).shape))
+            # print("required lenght {}".format(self.x_res * self.hop_length))
+            # print("padding with shape {}".format(np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length -(self.sample_len))).shape))
             # self.wave = np.concatenate([self.wave, np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length - self.sample_len))])
             self.wave = np.concatenate([self.wave, np.zeros((self.batch_size, self.eeg_channels, self.x_res * self.hop_length - self.sample_len))], axis=2)
 
@@ -356,6 +356,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
         """
         # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
         latent = - latent.transpose(0, 2, 1)
+        latent = latent.transpose(0, 2, 1)
         log_spectrogram = latent.reshape(self.eeg_channels, self.n_mels, -1)
         waves = []
         for i in range(log_spectrogram.shape[0]):
@@ -387,7 +388,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
             wave (`np.ndarray`): raw wave
         """
         # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
-        latent = latent.transpose(0, 1, 3, 2)
+        latent = latent.transpose(0, 1, 2, 3)
         log_spectrogram = latent.reshape(self.batch_size * self.eeg_channels, self.n_mels, -1)
 
         future_waves = []
@@ -405,7 +406,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
 
         return np.stack(waves, axis=0).reshape(self.batch_size, self.eeg_channels, -1)
     
-    def plot_spectrogram(self, latent, save_fig="./braindiffusion/visualization/spectrogram.png"):
+    def plot_spectrogram(self, latent, save_fig="./braindiffusion/visualization/spectrogram.png", channel_index=0):
         # Compute the spectrogram
         spectrogram = np.abs(latent).transpose(1,0)
         
@@ -414,7 +415,7 @@ class Spectro(ConfigMixin, SchedulerMixin):
         im = ax.imshow(spectrogram, cmap='hot', origin='lower')
         ax.set_ylabel('Frequency')
         ax.set_xlabel('Time')
-        ax.set_title('Spectrogram')
+        ax.set_title('Spectrogram with channel {}'.format(channel_index))
         fig.colorbar(im, ax=ax)
         
         # Save the plot as an image
@@ -454,12 +455,16 @@ class Spectro(ConfigMixin, SchedulerMixin):
             `PIL Image`: grayscale image of x_res x y_res
         """
         return self.latent_to_image(self.wave_channelslice_to_latent(slice))
+    
+    def get_sample_rate(self):
+        return self.sr
         
     
 
 if __name__ == "__main__":
     print("test start")
     sample_wave = np.random.rand(2, 22, 750)
+    sample_latent = np.random.rand(22, 32, 64)
     converter = Spectro()
     converter.load_wave(raw_wave=sample_wave)
     print(converter.wave.shape)
@@ -475,5 +480,6 @@ if __name__ == "__main__":
     print(latent.shape)
     print(converter.plot_spectrogram(latent[0][0],save_fig='./test.png').size)
     print(sample_wave)
+    print(converter.single_latent_to_wave(sample_latent).shape)
     # print(sample_wave-inversed_wave[:,:,:750])
     

@@ -1,0 +1,34 @@
+
+# based on https://github.com/CompVis/stable-diffusion/blob/main/configs/autoencoder/autoencoder_kl_32x32x4.yaml
+
+model:
+  base_learning_rate: 4.5e-6
+  target: ldm.models.autoencoder.AutoencoderKL
+  params:
+    monitor: "val/rec_loss"
+    embed_dim: 1  # = in_channels
+    lossconfig:
+      target: ldm.modules.losses.LPIPSWithDiscriminator
+      params:
+        disc_start: 50001
+        kl_weight: 0.000001
+        disc_weight: 0.5
+        disc_in_channels: 1  # = out_ch
+
+    ddconfig:
+      double_z: True
+      z_channels: 1  # must = embed_dim due to HF limitation
+      resolution: 256  # overriden by input image size
+      in_channels: 1
+      out_ch: 1
+      ch: 128
+      ch_mult: [ 1,2,4,4 ]  # num_down = len(ch_mult)-1
+      num_res_blocks: 2
+      attn_resolutions: [ ]
+      dropout: 0.0
+
+lightning:
+  trainer:
+    benchmark: True
+    accelerator: gpu
+    devices: 1
