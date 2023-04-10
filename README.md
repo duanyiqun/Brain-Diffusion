@@ -37,10 +37,10 @@ pip install -e .
 pip instlal -r requirements.txt
 ```
 
-<div align="center">
+<div align="left">
 
 ## Base Diffusion (BCI-IV Dataset)
-------------------------------------------------------------------------
+
 </div>
 
 ## Data Preparation
@@ -94,11 +94,11 @@ Here are examples of the visualization, mainly include the spectrogram, and the 
 </div>
 
 
-<div align="center">
+<div align="left">
 </br>
 
 ## Conditioned Latent Diffusion (Zuco Dataset)
-------------------------------------------------------------------------
+
 </div>
 
 
