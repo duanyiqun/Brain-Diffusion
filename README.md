@@ -134,12 +134,14 @@ Here are examples of the visualization nearly end of the training, mainly includ
               └── task3-TSR-dataset.pickle
   ```
 
-
-
 * Generate Spectros: Please note this may cost 100G+ memory. If you have enough memory, you can run the following command to generate spectrograms. Or you may modify the code to generate spectrograms each time for a split by comment out data parts in [scripts/wave2spectro_zuco.py](scripts/wave2spectro_zuco.py).
   ```sh 
   python scripts/wave2spectro_zuco.py --resolution 96,96 --input_dir path-to-preprocessed-zuco --output_dir path-to-output-data --hop_length 75 --sample_rate 500 --n_fft 100
   ```
+  please note that the hop_length is the number of samples between the starts of consecutive frames. The sample_rate is the sampling frequency of the wave. The n_fft is the number of samples in each frame. The resolution is the resolution of the spectrogram. 
+  
+  Please also not that you can modify this scripts to swich between generate mel **spectro** and **stft sprctro**. 
+
 
 ## Training
 
@@ -149,6 +151,11 @@ Here are examples of the visualization nearly end of the training, mainly includ
   ```
 
 * Training scripts
+  
+  The current training version support both diffusion on mel spectrogram and STFT spectrogram. Here I give examples below:
+
+  * Training on STFT spectrogram Data
+
   ```sh
   CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
   scripts/train_unet_conditioned.py \
@@ -166,6 +173,7 @@ Here are examples of the visualization nearly end of the training, mainly includ
       --lr_warmup_steps 500 \
       --mixed_precision fp16
   ```
+  * Training on Mel spectrogram Data
 
   ```sh
   CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
