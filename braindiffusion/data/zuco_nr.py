@@ -84,7 +84,7 @@ def get_input_sample(sent_obj, tokenizer, eeg_type = 'GD', bands = ['_t1','_t2',
     if torch.isnan(sent_level_eeg_tensor).any():
         # print('[NaN sent level eeg]: ', target_string)
         return None
-    input_sample['sent_level_EEG'] = pad_to_max_sample(sent_level_eeg_tensor, max_len=8350)
+    input_sample['sent_level_EEG'] = pad_to_max_sample(sent_level_eeg_tensor, max_len=5500)
 
     # get sentiment label
     # handle some wierd case

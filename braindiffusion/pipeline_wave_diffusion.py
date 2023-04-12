@@ -27,8 +27,8 @@ from diffusers import (
 from diffusers.utils import BaseOutput
 from PIL import Image
 
-from braindiffusion.utils.wave_spectron import Spectro
-from braindiffusion.utils.mne_visualize import visualize_eeg1020
+from braindiffusion.utils.wave_spectron import Spectro, Spectro_STFT
+from braindiffusion.utils.mne_visualize import visualize_eeg1020, visualize_eeg128
 from braindiffusion.utils.sampling_func import *
 
 class WaveDiffusionPipeline(DiffusionPipeline):
@@ -212,7 +212,10 @@ class WaveDiffusionPipeline(DiffusionPipeline):
 
         # for channel_index in range():
         wave = self.Spectro.single_latent_to_wave(latent=images[0])
-        pil_psd, pil_raw = visualize_eeg1020(wave, self.Spectro.get_sample_rate(), n_channels=22)
+        if wave.shape[0] > 22:
+            pil_psd, pil_raw = visualize_eeg128(wave, self.Spectro.get_sample_rate(), n_channels=wave.shape[0])
+        else:
+            pil_psd, pil_raw = visualize_eeg1020(wave, self.Spectro.get_sample_rate(), n_channels=22)
         
         if not return_dict:
             return spec_images, (self.Spectro.get_sample_rate(), [pil_psd, pil_raw])

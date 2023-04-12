@@ -65,9 +65,9 @@ The training entry scripts:
 ```bash
 accelerate launch --config_file config/accelerate_local.yaml \
 scripts/train_unet.py \
-    --dataset_name dataset/bci_iv/spectro_dp \
-    --hop_length 50 \
-    --output_dir models/spectro_dp-3264 \
+    --dataset_name dataset/bci_iv/stft_64-24 \
+    --hop_length 93 \
+    --output_dir models/bciiv_stft_64 \
     --train_batch_size 2 \
     --num_epochs 100 \
     --gradient_accumulation_steps 1 \
@@ -83,7 +83,7 @@ wandb login
 
 You can switch between logging in tensorboard or wandb by modify the accelerator config file. The default generator is wandb. The project name could be modified by given additional args ```--wandb_projects```. 
 The visualization of the image is saved locally to prevent breaking the training process. The visualization of the training process could be found in modesl/name/visualization file. The saving interval could be modified by ```--save_images_epochs```. 
-Here are examples of the visualization, mainly include the spectrogram, and the reconstructed wave.
+Here are examples of the visualization nearly end of the training, mainly include the spectrogram, and the reconstructed wave.
 
 
 <div align="center">
@@ -97,7 +97,7 @@ Here are examples of the visualization, mainly include the spectrogram, and the 
 <div align="left">
 </br>
 
-## Conditioned Latent Diffusion (Zuco Dataset)
+## Conditioned Diffusion (Zuco Dataset)
 
 </div>
 
@@ -112,7 +112,7 @@ Here are examples of the visualization, mainly include the spectrogram, and the 
   * Modify the data paths and roots in [construct_wave_mat_to_pickle_v1.py](util/construct_dataset_mat_to_pickle_v1.py) and [construct_wave_mat_to_pickle_v2.py](util/construct_dataset_mat_to_pickle_v2.py)
   * Run [scripts/data_preparation_freq.sh](scripts/data_preparation_freq.sh) for eye-tracking fixation sliced EEG waves. 
 * Preparation scripts for raw waves
-  * Modify the roots variable in  [scripts/data_preparation_wave.sh](scripts/data_preparation_wave.sh) and run the scripts, -r suggest the source root, -o denotes the output notes
+  * Modify the roots variable in  [scripts/data_preparation_wave.sh](scripts/data_preparation_wave.sh) and run the scripts, -r suggest the input dir, -o denotes the output dir.
   ```python3 
   ./util/construct_wave_mat_to_pickle_v1.py -t task3-TSR -r /projects/CIBCIGroup/00DataUploading/yiqun/bci -o /projects/CIBCIGroup/00DataUploading/yiqun/bci/ZuCo/dewave_sent
   ```
@@ -136,10 +136,54 @@ Here are examples of the visualization, mainly include the spectrogram, and the 
 
 
 
-* Generate Spectros: Please note this may cost 80G memory. If you have enough memory, you can run the following command to generate spectrograms. Or you may modify the code to generate spectrograms each time for a split by comment out data parts in [scripts/wave2spectro_zuco.py](scripts/wave2spectro_zuco.py).
+* Generate Spectros: Please note this may cost 100G+ memory. If you have enough memory, you can run the following command to generate spectrograms. Or you may modify the code to generate spectrograms each time for a split by comment out data parts in [scripts/wave2spectro_zuco.py](scripts/wave2spectro_zuco.py).
   ```sh 
   python scripts/wave2spectro_zuco.py --resolution 96,96 --input_dir path-to-preprocessed-zuco --output_dir path-to-output-data --hop_length 75 --sample_rate 500 --n_fft 100
   ```
 
 ## Training
+
+* Encode condition text files for training. Here we use Berttokenizer to encode the text. The pretrained model is from [bert-base-uncased](https://huggingface.co/bert-base-uncased). The encoded text embedding cache will be saved in the output root.
+  ```sh
+  python scripts/encode_condition.py --input_dir path-to-preprocessed-zuco --output_dir path-to-output-data --task_name task1-SR
+  ```
+
+* Training scripts
+  ```sh
+  CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
+  scripts/train_unet_conditioned.py \
+      --dataset_name dataset/zuco/stft-96-64 \
+      --stft \
+      --hop_length 69 \
+      --eeg_channels 105 \
+      --n_fft 127 \
+      --sample_rate 500 \
+      --output_dir models/zuco-stft9664-test \
+      --train_batch_size 2 \
+      --num_epochs 100 \
+      --gradient_accumulation_steps 1 \
+      --learning_rate 1e-4 \
+      --lr_warmup_steps 500 \
+      --mixed_precision fp16
+  ```
+
+  ```sh
+  CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
+  scripts/train_unet_conditioned.py \
+      --dataset_name dataset/zuco/condition \
+      --hop_length 75 \
+      --eeg_channels 105 \
+      --n_fft 100 \
+      --sample_rate 500 \
+      --output_dir models/zuco-mel-test \
+      --train_batch_size 2 \
+      --num_epochs 100 \
+      --gradient_accumulation_steps 1 \
+      --learning_rate 1e-4 \
+      --lr_warmup_steps 500 \
+      --max_freq 64 \
+      --original_shape 105,112,96 \
+      --force_rescale 105,96,64 \
+      --mixed_precision fp16 \
+  ```
 

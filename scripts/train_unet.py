@@ -16,7 +16,7 @@ from datasets import load_dataset, load_from_disk
 from diffusers import (AutoencoderKL, DDIMScheduler, DDPMScheduler,
                        UNet2DConditionModel, UNet2DModel)
 from diffusers.optimization import get_scheduler
-from braindiffusion.utils.wave_spectron import Spectro
+from braindiffusion.utils.wave_spectron import Spectro_STFT as Spectro
 from diffusers.training_utils import EMAModel
 from huggingface_hub import HfFolder, Repository, whoami
 from librosa.util import normalize
@@ -48,8 +48,8 @@ def main(args):
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
-        # log_with="tensorboard",
-        log_with="wandb",
+        log_with="tensorboard",
+        # log_with="wandb",
         logging_dir=logging_dir,  
     )
 
@@ -403,7 +403,7 @@ if __name__ == "__main__":
         default=None,
         help="A folder containing the training data.",
     )
-    parser.add_argument("--output_dir", type=str, default="models/spectro_dp-3264")
+    parser.add_argument("--output_dir", type=str, default="models/bci_iv_stft-16-64")
     parser.add_argument("--overwrite_output_dir", type=bool, default=False)
     parser.add_argument("--cache_dir", type=str, default=None)
     parser.add_argument("--train_batch_size", type=int, default=2)
@@ -430,8 +430,8 @@ if __name__ == "__main__":
     parser.add_argument("--hub_private_repo", type=bool, default=False)
     parser.add_argument("--logging_dir", type=str, default="logs")
     parser.add_argument("--visualization_dir", type=str, default="visualizations")
-    parser.add_argument("--original_shape", type=str, default="22,32,64")
-    parser.add_argument("--debug", type=bool, default=False)
+    parser.add_argument("--original_shape", type=str, default="22,24,64")
+    parser.add_argument("--debug", type=bool, default=True)
     parser.add_argument("--save_image_tensorboard", type=bool, default=False)
     parser.add_argument("--wandb_projects", type=str, default='braindiffusion')
     parser.add_argument
@@ -445,9 +445,9 @@ if __name__ == "__main__":
             "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
             "and an Nvidia Ampere GPU."),
     )
-    parser.add_argument("--hop_length", type=int, default=50)
+    parser.add_argument("--hop_length", type=int, default=75)
     parser.add_argument("--sample_rate", type=int, default=250)
-    parser.add_argument("--n_fft", type=int, default=100)
+    parser.add_argument("--n_fft", type=int, default=127)
     parser.add_argument("--from_pretrained", type=str, default=None)
     parser.add_argument("--start_epoch", type=int, default=0)
     parser.add_argument("--num_train_steps", type=int, default=1000)

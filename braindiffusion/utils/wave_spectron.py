@@ -481,8 +481,8 @@ class Spectro_STFT(ConfigMixin, SchedulerMixin):
         x_res: int = 16,
         y_res: int = 51, # delta (0.5-4Hz), theta (4-8 Hz), alpha (8-14 Hz), beta (14-30Hz) and gamma (above 30Hz)
         sample_rate: int = 250, # 250hz for MI 500hz for reading
-        n_fft: int = 100, # time window
-        hop_length: int = 50, # time step
+        n_fft: int = 127, # time window
+        hop_length: int = 75, # time step
         top_db: int = 50, 
         n_iter: int = 32,
         eeg_channels : int = 22, 
@@ -596,13 +596,18 @@ class Spectro_STFT(ConfigMixin, SchedulerMixin):
             wave (`np.ndarray`): raw wave
         """
         latent = latent.transpose(0, 2, 1)
+        # print(latent.shape)
         # bytedata = np.frombuffer(image.tobytes(), dtype="uint8").reshape((image.height, image.width))
-        scale_factor = [1] * len(latent[0])
+        scale_factor = [1] * len(latent)
+        # print(len(latent[0]))
         X_rec = []
         for x_stft, scale_factor in zip(latent, scale_factor):
+            # print(x_stft.shape)
             x_rec = istft(x_stft, nperseg=self.n_fft, noverlap=self.hop_length, window=self.window)[1]
             X_rec.append(x_rec * scale_factor)
-            print(x_rec)
+            # print(x_rec.shape)
+        # print(len(X_rec))
+       # print(np.stack(X_rec, axis=0).shape)
 
         return np.stack(X_rec, axis=0).reshape(self.eeg_channels, -1)
     
@@ -636,6 +641,7 @@ if __name__ == "__main__":
     print("test start")
     # sample_wave = np.random.rand(2, 22, 750)
     # sample_latent = np.random.rand(22, 32, 64)
+    """
     sample_wave = np.random.rand(2, 105, 8350)
     sample_latent = np.random.rand(105, 112, 96)
     ### test spectrogram
@@ -657,16 +663,34 @@ if __name__ == "__main__":
     print(converter.single_latent_to_wave(sample_latent).shape)
     # print(sample_wave-inversed_wave[:,:,:750])
 
-    ### test spectrogram stft
+    为了计算STFT后的形状，我们需要了解信号的分段和重叠方式。给定参数sample_rate=500, n_fft=250, 和 hop_length=116，我们可以计算STFT后的形状。
+
+        频率维度：频率维度的大小等于n_fft的一半加1（n_fft // 2 + 1），因为对于实数输入信号，傅里叶变换的结果是对称的。在这里，我们有 250 // 2 + 1 = 126 个频率分量。
+        时间维度：时间维度的大小可以通过计算信号中完整的时间窗口（segment）的数量得到。信号长度为5500，每个窗口长度为250，窗口之间的步长为116。我们可以用以下公式计算时间维度的大小：
+
+    time_windows = 1 + (signal_length - n_fft) // hop_length
+
     """
+    ### test spectrogram stft
+    
     sample_wave = np.random.rand(2, 22, 750)
-    sample_latent = np.random.rand(22, 16, 51)
-    converter = Spectro_STFT()
+    sample_latent = np.random.rand(22, 16, 64)
+    converter = Spectro_STFT(x_res=16, y_res=64, sample_rate=250, n_fft=127, hop_length=93, eeg_channels=22)
     converter.load_wave(raw_wave=sample_wave)
-    print(converter.wave.shape)
     print(converter.single_wave_to_latent(sample_wave[0]).shape)
     print(converter.single_latent_to_wave(sample_latent).shape)
     print(converter.get_sample_rate())
     print(converter.get_number_of_channels())
     print(converter.plot_spectrogram(converter.single_wave_to_latent(sample_wave[0])[0],save_fig='./test.png').size)
-    """
+
+    sample_wave = np.random.rand(2, 105, 5500)
+    sample_latent = np.random.rand(105, 96, 64)
+    converter = Spectro_STFT(x_res=96, y_res=64, sample_rate=500, n_fft=127, hop_length=69, eeg_channels=105)
+    converter.load_wave(raw_wave=sample_wave)
+    # print(converter.wave.shape)
+    print(converter.single_wave_to_latent(sample_wave[0]).shape)
+    print(converter.single_latent_to_wave(sample_latent).shape)
+    print(converter.get_sample_rate())
+    print(converter.get_number_of_channels())
+    print(converter.plot_spectrogram(converter.single_wave_to_latent(sample_wave[0])[0],save_fig='./test.png').size)
+    
