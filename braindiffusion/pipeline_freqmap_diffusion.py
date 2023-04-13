@@ -28,8 +28,9 @@ from diffusers.utils import BaseOutput
 from PIL import Image
 
 from braindiffusion.utils.wave_spectron import Spectro, Spectro_STFT
-from braindiffusion.utils.mne_visualize import visualize_eeg1020, visualize_eeg128, visualize_feature_map, visualize_feature_map_withtoken
+from braindiffusion.utils.mne_visualize import visualize_eeg1020, visualize_eeg128, visualize_feature_map, visualize_feature_map_withtoken, create_topo_heat_maps, stack_topomaps
 from braindiffusion.utils.sampling_func import *
+
 
 class WaveDiffusionPipeline(DiffusionPipeline):
     """
@@ -208,19 +209,29 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         # images = (images * 255).round().astype("uint8")
         # select bs 1 for visualization 22 channels
         spec_images = []
+        topoimages = []
         for index, featuremap in enumerate(images):
             if target_ids is not None:
-                temp_img = visualize_feature_map_withtoken(featuremap[0], target_ids[index])
-                spec_images.append(temp_img)
+                if featuremap.shape[0] == 8:
+                    for channel_feature_map in featuremap:
+                        temp_img = visualize_feature_map_withtoken(channel_feature_map.transpose(1,0), target_ids[index])
+                        spec_images.append(temp_img)
+                else:
+                    temp_img = visualize_feature_map_withtoken(featuremap[0], target_ids[index])
+                    spec_images.append(temp_img)
             else:
                 temp_img = visualize_feature_map(featuremap[0])
                 spec_images.append(temp_img)
-        
+        channels_indices = np.random.choice(range(128), 105, replace=False)
+        for index, featuremap in enumerate(images):
+            topolist = create_topo_heat_maps(featuremap, target_ids[index] , channels_indices)
+            topoimages.append(topolist)
+
         # for channel_index in range():
         
 
         if not return_dict:
-            return spec_images, (500, [None, None])
+            return spec_images, (500, topoimages)
 
         return BaseOutput(**wavePipelineOutput(np.array(waves)[:, np.newaxis, :]), **ImagePipelineOutput(images))
 

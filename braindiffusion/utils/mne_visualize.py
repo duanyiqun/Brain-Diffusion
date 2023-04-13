@@ -1,4 +1,6 @@
 import numpy as np
+import mne
+import io
 from mne import create_info, concatenate_raws
 from mne.io import RawArray
 from mne.channels import make_standard_montage
@@ -9,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
 from transformers import BertTokenizerFast
-
+import gif
 
 
 def visualize_eeg1020(data, sample_rate=250, duration=3, n_channels=22):
@@ -123,9 +125,9 @@ def visualize_feature_map_withtoken(feature_map, target_tokens):
 
     # Revert tokens to a sentence using BertTokenizer
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-    sentence = tokenizer.decode(target_tokens, skip_special_tokens=True)
+    sentence = tokenizer.decode(target_tokens, skip_special_tokens=False)
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(12, 6), gridspec_kw={'height_ratios': [4, 1]})
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(12, 7), gridspec_kw={'height_ratios': [4, 1]})
     canvas = FigureCanvas(fig)
 
     img = ax1.imshow(feature_map, cmap="viridis", aspect="auto")
@@ -151,9 +153,93 @@ def visualize_feature_map_withtoken(feature_map, target_tokens):
     return pil_image
 
 
+def create_topo_heat_maps(feature_map, token_ids, channels_indices, skip_special_tokens=False):
+    # 频带名称
+    band_names = ['theta_1', 'theta_2', 'alpha_1', 'alpha_2', 'beta_1', 'beta_2', 'gamma_1', 'gamma_2']
+    
+    # 将token ID转换为文本
+    tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+    tokens = tokenizer.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
+    
+    # 加载biosemi128布局
+    # layout = mne.channels.make_standard_montage('biosemi128')
+    # ch_names = layout.ch_names
+    
+    montage = make_standard_montage('biosemi128')
+    ch_names = montage.ch_names
+    # 选择需要的通道
+    selected_ch_names = [ch_names[i] for i in channels_indices]
+
+    ch_types = ['eeg'] * len(channels_indices)
+    sfreq = 500  # Hz
+    
+    
+    # 创建包含56张PIL Image的列表
+    images = []
+    
+    # 遍历所有时刻
+    for i in range(len(tokens)):
+        fig, axes = plt.subplots(1, 8, figsize=(16, 2))
+        canvas = FigureCanvas(fig)
+        
+        # 遍历所有频带
+        for j, band_name in enumerate(band_names):
+            # 创建一个包含105个通道的空info对象
+            info = create_info(ch_names=selected_ch_names, ch_types=ch_types, sfreq=sfreq)
+            # 提取特定时刻和频带的EEG数据
+            eeg_data = feature_map[j, :, i]
+            # print(len(channels_indices))
+            # print(np.array([[eeg_data],[eeg_data]]).transpose(0,2,1).shape)
+            # 创建Epochs数据
+            info.set_montage(montage)
+            epochs = mne.EpochsArray(np.array([[eeg_data],[eeg_data]]).transpose(0,2,1), info)
+            
+            # 绘制脑区拓扑地形图
+            im, _ = mne.viz.plot_topomap(eeg_data, epochs.info, axes=axes[j], show=False)
+            axes[j].set_title(f"{band_name}")
+        
+        # 添加文本
+        # print(i)
+        # print(tokens[i])
+        plt.suptitle(f"Token: {tokens[i]}", fontsize=14, y=1)
+        
+        # 将绘制的图像保存为PIL Image
+        plt.tight_layout()
+
+        # Draw the plot to the canvas buffer
+        canvas.draw()
+
+        # Convert the plot to a PIL image
+        pil_image = Image.frombytes('RGB', canvas.get_width_height(), canvas.tostring_rgb())
+        plt.close(fig)
+        images.append(pil_image)
+        pil_image.save('test.png')
+    
+    return images
+
+
+def stack_topomaps(heat_map_images, file_nmae='merged_image.png'):
+    # 计算总的高度
+    total_height = sum([img.height for img in heat_map_images])
+
+    # 创建一个新的空白图像，其宽度等于第一张图像的宽度，高度等于所有图像的总高度
+    merged_image = Image.new('RGB', (heat_map_images[0].width, total_height))
+
+    # 纵向拼接图像
+    y_offset = 0
+    for img in heat_map_images:
+        merged_image.paste(img, (0, y_offset))
+        y_offset += img.height
+
+    # 显示拼接后的图像
+    # merged_image.show()
+
+    # 如果需要保存拼接后的图像
+    merged_image.save(file_nmae)
 
 
 if __name__ == '__main__':
+    """
     data = np.random.rand(22, 1550)
     pil_image, pil_image_raw = visualize_eeg1020(data)
     pil_image.save('test.png')
@@ -173,3 +259,13 @@ if __name__ == '__main__':
     target_tokens = [101, 1045, 2572, 3467, 2000, 3422, 2070, 5561, 102] 
     pil_image = visualize_feature_map_withtoken(data, target_tokens)
     pil_image.save('test_feature.png')
+    """
+    target_tokens = [101, 1045, 2572, 3467, 2000, 3422, 2070, 5561, 102, 0, 0, 0, 0, 0, 0, 0, 0]
+    feature_map = np.random.rand(8, 105, 56)
+    token_ids = target_tokens
+    channels_indices = np.random.choice(range(128), 105, replace=False)
+
+    # 调用函数
+    heat_map_images = create_topo_heat_maps(feature_map, token_ids, channels_indices)
+    heat_map_images[0].save('test.png')
+    stack_topomaps(heat_map_images)
