@@ -145,7 +145,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create dataset of Mel spectrograms from directory of audio files.")
     parser.add_argument("--input_dir", default='/home/yiqduan/Data/bci/EEG_MI_DARTS/Mudus_BCI/data/bci_iv/', type=str)
-    parser.add_argument("--output_dir", type=str, default="./dataset/bci_iv/stft_64-24")
+    parser.add_argument("--output_dir", type=str, default="./dataset/bci_iv/stft_64-28")
     parser.add_argument(
         "--resolution",
         type=str,

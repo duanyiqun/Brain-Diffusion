@@ -4,6 +4,12 @@ from mne.io import RawArray
 from mne.channels import make_standard_montage
 from mne.viz import plot_epochs_image
 from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from PIL import Image
+from transformers import BertTokenizerFast
+
 
 
 def visualize_eeg1020(data, sample_rate=250, duration=3, n_channels=22):
@@ -73,6 +79,79 @@ def visualize_eeg128(data, sample_rate=500, duration=3, n_channels=105):
 
     return pil_image, pil_image_raw
 
+def visualize_feature_map(feature_map):
+    """
+    Visualize a feature map with shape (56, 840) and return a PIL image with color bar.
+
+    :param feature_map: A 2D NumPy array with shape (56, 840)
+    :return: A PIL image object
+    """
+
+    # if feature_map.shape != (56, 840):
+    #     raise ValueError("Feature map must have shape (56, 840)")
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    canvas = FigureCanvas(fig)
+
+    img = ax.imshow(feature_map, cmap="viridis", aspect="auto")
+    fig.colorbar(img, ax=ax)
+
+    ax.set_title("Feature Map Visualization")
+    ax.set_xlabel("Frequency Features Dimension")
+    ax.set_ylabel("Features tokens")
+
+    plt.tight_layout()
+
+    # Draw the plot to the canvas buffer
+    canvas.draw()
+
+    # Convert the plot to a PIL image
+    pil_image = Image.frombytes('RGB', canvas.get_width_height(), canvas.tostring_rgb())
+    plt.close(fig)
+
+    return pil_image
+
+
+def visualize_feature_map_withtoken(feature_map, target_tokens):
+    """
+    Visualize a feature map with shape (56, 840) and return a PIL image with color bar and target tokens as a sentence.
+
+    :param feature_map: A 2D NumPy array with shape (56, 840)
+    :param target_tokens: A list of tokenized words from BERT uncased tokenizer
+    :return: A PIL image object
+    """
+
+    # Revert tokens to a sentence using BertTokenizer
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
+    sentence = tokenizer.decode(target_tokens, skip_special_tokens=True)
+
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(12, 6), gridspec_kw={'height_ratios': [4, 1]})
+    canvas = FigureCanvas(fig)
+
+    img = ax1.imshow(feature_map, cmap="viridis", aspect="auto")
+    fig.colorbar(img, ax=ax1)
+
+    ax1.set_title("Feature Map Visualization")
+    ax1.set_xlabel("Frequency Features Dimension")
+    ax1.set_ylabel("Features tokens")
+
+    # Display the sentence under the feature map
+    ax2.axis('off')
+    ax2.text(0.5, 0.5, sentence, wrap=True, horizontalalignment='center', fontsize=12)
+
+    plt.tight_layout()
+
+    # Draw the plot to the canvas buffer
+    canvas.draw()
+
+    # Convert the plot to a PIL image
+    pil_image = Image.frombytes('RGB', canvas.get_width_height(), canvas.tostring_rgb())
+    plt.close(fig)
+
+    return pil_image
+
+
+
 
 if __name__ == '__main__':
     data = np.random.rand(22, 1550)
@@ -84,3 +163,13 @@ if __name__ == '__main__':
     pil_image, pil_image_raw = visualize_eeg128(data)
     pil_image.save('test128.png')
     pil_image_raw.save('test128_raw.png')
+
+
+    data = np.random.rand(56, 840)
+    pil_image = visualize_feature_map(data)
+    pil_image.save('test_feature.png')
+
+    data = np.random.rand(56, 840)
+    target_tokens = [101, 1045, 2572, 3467, 2000, 3422, 2070, 5561, 102] 
+    pil_image = visualize_feature_map_withtoken(data, target_tokens)
+    pil_image.save('test_feature.png')

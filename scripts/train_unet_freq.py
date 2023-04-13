@@ -17,14 +17,15 @@ from datasets import load_dataset, load_from_disk
 from diffusers import (AutoencoderKL, DDIMScheduler, DDPMScheduler,
                        UNet2DConditionModel, UNet2DModel)
 from diffusers.optimization import get_scheduler
-from braindiffusion.utils.wave_spectron import Spectro_STFT, Spectro
+from braindiffusion.utils.wave_spectron import Spectro, Spectro_STFT
+# from braindiffusion.utils.wave_spectron import Spectro_STFT as Spectro
 from diffusers.training_utils import EMAModel
 from huggingface_hub import HfFolder, Repository, whoami
 from librosa.util import normalize
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor, Resize
 from tqdm.auto import tqdm
 
-from braindiffusion.pipeline_wave_diffusion import WaveDiffusionPipeline
+from braindiffusion.pipeline_freqmap_diffusion import WaveDiffusionPipeline
 
 logger = get_logger(__name__)
 
@@ -49,8 +50,8 @@ def main(args):
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
-        log_with="tensorboard",
-        # log_with="wandb",
+        # log_with="tensorboard",
+        log_with="wandb",
         logging_dir=logging_dir,  
     )
 
@@ -74,36 +75,10 @@ def main(args):
             cache_dir=args.cache_dir,
             split="train",
         )
-
     # Determine image resolution
     args.original_shape = tuple(int(x) for x in args.original_shape.split(","))
     args.force_rescale = tuple(int(x) for x in args.force_rescale.split(","))
-    if args.force_rescale is not None:
-        print(args.force_rescale)
-
     if args.stft:
-        print(np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape)
-        resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
-        # resolution = (resolution[0], int(resolution[1]//1.2), int(resolution[2]//1.5))
-        # resolution = dataset[0]["image"].height, dataset[0]["image"].width
-        max_freq = args.max_freq
-        # assert max_freq < args.original_shape[2]
-        resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
-        resolution = (resolution[0], int(resolution[1]), max_freq)
-        if args.force_rescale is not None:
-            if resolution[1] < args.force_rescale[1]:
-                resolution = (resolution[0], args.force_rescale[1], resolution[2])
-        if args.force_rescale is not None:
-            print("rescale to :{}".format(resolution))
-
-        augmentations = Compose([
-                lambda x: np.frombuffer(x, dtype=np.float64).reshape(args.original_shape)[:,:,:max_freq].transpose().transpose(1,0,2).astype(np.float32), # convert bytes to numpy original
-                lambda x: np.abs(x), # resize to original
-                ToTensor(),
-                Normalize([0.5], [0.5]).float(),
-                lambda x: F.interpolate(x.unsqueeze(0).unsqueeze(0), size=(22, 32, 64), mode='trilinear', align_corners=False).squeeze(0).squeeze(0),  # resize tensor to (batchsize, 22, 32, 64)
-            ])
-    else:
         print(np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape)
         resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
         # resolution = (resolution[0], int(resolution[1]//1.2), int(resolution[2]//1.5))
@@ -124,6 +99,23 @@ def main(args):
             ToTensor(),
             Normalize([0.5], [0.5]).float(),
         ])
+    else:
+        print(np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape)
+        resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
+        # resolution = (resolution[0], int(resolution[1]//1.2), int(resolution[2]//1.5))
+        # resolution = dataset[0]["image"].height, dataset[0]["image"].width
+        max_freq = args.max_freq
+        # assert max_freq < args.original_shape[2]
+        resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
+        resolution = (resolution[0], int(resolution[1]), max_freq)
+
+        augmentations = Compose([
+            lambda x: np.frombuffer(x, dtype=np.float64).reshape(args.original_shape)[:,:,:max_freq].transpose().transpose(1,0,2).astype(np.float32), # convert bytes to numpy original 
+            lambda x: np.abs(x), # resize to original
+            # lambda x: print(x.shape), # resize to original
+            ToTensor(),
+            Normalize([0.5], [0.5]).float(),
+        ])
 
     def transforms(examples):
         if args.vae is not None and vqvae.config["in_channels"] == 3:
@@ -134,8 +126,9 @@ def main(args):
         else:
             images = [augmentations(image) for image in examples["image"]]
         if args.encodings is not None:
-            encoding = [encodings[file] for file in examples["text_file"]]
-            return {"input": images, "encoding": encoding}
+            encoding = [encodings[str(target_ids)][:int(resolution[1]),:] for target_ids in examples["target_ids"]]
+            
+            return {"input": images, "encoding": encoding, "target_ids": examples["target_ids"]}
         return {"input": images}
 
     dataset.set_transform(transforms)
@@ -260,22 +253,26 @@ def main(args):
     if accelerator.is_main_process:
         run = os.path.split(__file__)[-1].split(".")[0]
         accelerator.init_trackers(args.wandb_projects)
+
     if args.stft:
-        print("setting to STFT")
+        print("setting spectro to Spectro_STFT")
         spectro = Spectro_STFT(
             x_res=resolution[1],
             y_res=resolution[0],
             hop_length=args.hop_length,
             sample_rate=args.sample_rate,
             n_fft=args.n_fft,
+            eeg_channels=args.eeg_channels,
         )
     else:
+        print("setting spectro to spectro")
         spectro = Spectro(
             x_res=resolution[1],
             y_res=resolution[0],
             hop_length=args.hop_length,
             sample_rate=args.sample_rate,
             n_fft=args.n_fft,
+            eeg_channels=args.eeg_channels,
         )
 
     
@@ -294,7 +291,7 @@ def main(args):
             if epoch == args.start_epoch - 1 and args.use_ema:
                 ema_model.optimization_step = global_step
             continue
-
+        
         ########`  TRAINING LOOP  `########
 
         model.train()
@@ -303,9 +300,10 @@ def main(args):
                 break
             clean_images = batch["input"]
             if args.debug:
+                print("clean_images.shape")
                 print(clean_images.shape)
 
-
+            # print(clean_images.shape)
             if vqvae is not None:
                 vqvae.to(clean_images.device)
                 with torch.no_grad():
@@ -329,6 +327,9 @@ def main(args):
             # (this is the forward diffusion process)
             noisy_images = noise_scheduler.add_noise(clean_images, noise,
                                                      timesteps)
+            if args.debug:
+                for channel_index, image in enumerate(clean_images.cpu().numpy()[0]):
+                    spectro.plot_spectrogram(image, save_fig='./clean_image{}.png'.format(channel_index)),
 
             with accelerator.accumulate(model):
                 # Predict the noise residual
@@ -398,10 +399,16 @@ def main(args):
 
                 if args.encodings is not None:
                     random.seed(42)
-                    encoding = torch.stack(
-                        random.sample(list(encodings.values()),
-                                      args.eval_batch_size)).to(
+                    target_ids = random.sample(list(encodings.keys()),
+                                      args.eval_batch_size)
+                    if args.debug:
+                        print(target_ids)
+                    encoding = [encodings[key][:int(resolution[1]),:] for key in target_ids]
+                    encoding = torch.stack(encoding).to(
                                           clean_images.device)
+                    # print(encoding.shape)
+                    target_ids = [eval(key) for key in target_ids]
+                        
                 else:
                     encoding = None
 
@@ -411,6 +418,7 @@ def main(args):
                     batch_size=args.eval_batch_size,
                     return_dict=False,
                     encoding=encoding,
+                    target_ids=target_ids,
                 )
 
                 # denormalize the images and save to tensorboard
@@ -424,19 +432,10 @@ def main(args):
                         "generated spetro images of 22 channels", images, epoch)
 
                 for index, image in enumerate(images):
+                    # print(type(image))
                     os.makedirs(os.path.join(visualization_dir, f"epoch{epoch}"), exist_ok=True)
-                    image.save(os.path.join(os.path.join(visualization_dir, f"epoch{epoch}"), f"spectro_image_epoch:{epoch}_channel{index}.png"))    
+                    image.save(os.path.join(os.path.join(visualization_dir, f"epoch{epoch}"), f"featuremap_images:{epoch}_bs{index}.png"))    
 
-                if args.save_image_tensorboard:
-                    for indx, image in enumerate(waves):
-                        # print(np.frombuffer(image.tobytes(), dtype="uint8").shape)
-                        # print(len(image.getbands()), image.height, image.width)
-                        image = np.frombuffer(image.tobytes(), dtype="uint8").reshape((len(image.getbands()), image.height, image.width))
-                        image=image[np.newaxis, ...]
-                        accelerator.trackers[0].writer.add_images(
-                            "sampled waves fusion map from latent image {}".format(indx), image, epoch, dataformats='NCHW')
-                waves[0].save(os.path.join(visualization_dir, f"psd_mapwave_{epoch}.png"))
-                waves[1].save(os.path.join(visualization_dir, f"raw_wave_{epoch}.png"))
         accelerator.wait_for_everyone()
 
     accelerator.end_training()
@@ -446,7 +445,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Simple example of a training script.")
     parser.add_argument("--local_rank", type=int, default=-1)
-    parser.add_argument("--dataset_name", type=str, default='dataset/bci_iv/spectro_dp')
+    parser.add_argument("--dataset_name", type=str, default='dataset/zuco/freqmap_32_840')
     parser.add_argument("--dataset_config_name", type=str, default=None)
     parser.add_argument(
         "--train_data_dir",
@@ -454,11 +453,11 @@ if __name__ == "__main__":
         default=None,
         help="A folder containing the training data.",
     )
-    parser.add_argument("--output_dir", type=str, default="models/bci_iv_stft-28-64")
+    parser.add_argument("--output_dir", type=str, default="models/zuco-freq_feature")
     parser.add_argument("--overwrite_output_dir", type=bool, default=False)
     parser.add_argument("--cache_dir", type=str, default=None)
-    parser.add_argument("--train_batch_size", type=int, default=2)
-    parser.add_argument("--eval_batch_size", type=int, default=2)
+    parser.add_argument("--train_batch_size", type=int, default=4)
+    parser.add_argument("--eval_batch_size", type=int, default=1)
     parser.add_argument("--num_epochs", type=int, default=100)
     parser.add_argument("--save_images_epochs", type=int, default=1)
     parser.add_argument("--save_model_epochs", type=int, default=10)
@@ -481,13 +480,16 @@ if __name__ == "__main__":
     parser.add_argument("--hub_private_repo", type=bool, default=False)
     parser.add_argument("--logging_dir", type=str, default="logs")
     parser.add_argument("--visualization_dir", type=str, default="visualizations")
-    parser.add_argument("--original_shape", type=str, default="22,28,64")
-    parser.add_argument("--debug", type=bool, default=False)
+    parser.add_argument("--original_shape", type=str, default="1,32,840")
+    parser.add_argument("--force_rescale", type=str, default="1,32,840")
+    parser.add_argument("--max_freq", type=int, default=64)
+    parser.add_argument("--debug", action="store_true")
+    # parser.add_argument("--debug", type=bool, default=True)
     parser.add_argument("--save_image_tensorboard", type=bool, default=False)
     parser.add_argument("--wandb_projects", type=str, default='braindiffusion')
-    parser.add_argument("--force_rescale", type=str, default="22,32,64")
-    parser.add_argument("--max_freq", type=int, default=64)
+    parser.add_argument("--eeg_channels", type=int, default=1)
     parser.add_argument("--stft", action="store_true")
+    parser.add_argument
     parser.add_argument(
         "--mixed_precision",
         type=str,
@@ -498,15 +500,15 @@ if __name__ == "__main__":
             "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
             "and an Nvidia Ampere GPU."),
     )
-    parser.add_argument("--hop_length", type=int, default=75)
-    parser.add_argument("--sample_rate", type=int, default=250)
-    parser.add_argument("--n_fft", type=int, default=127)
+    parser.add_argument("--hop_length", type=int, default=50)
+    parser.add_argument("--sample_rate", type=int, default=500)
+    parser.add_argument("--n_fft", type=int, default=100)
     parser.add_argument("--from_pretrained", type=str, default=None)
     parser.add_argument("--start_epoch", type=int, default=0)
     parser.add_argument("--num_train_steps", type=int, default=1000)
     parser.add_argument("--scheduler",
                         type=str,
-                        default="ddpm",
+                        default="ddim",
                         help="ddpm or ddim")
     parser.add_argument(
         "--vae",
@@ -517,7 +519,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--encodings",
         type=str,
-        default=None,
+        default="./dataset/zuco/spectro_dp/text_encodings_train.pt",
         help="picked dictionary mapping audio_file to encoding",
     )
 

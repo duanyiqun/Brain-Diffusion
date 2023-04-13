@@ -62,6 +62,26 @@ python scripts/wave2spectro.py \
 
 
 The training entry scripts:
+
+Training on Mel spectrogram
+
+```bash
+accelerate launch --config_file config/accelerate_local.yaml \
+scripts/train_unet.py \
+    --dataset_name dataset/bci_iv/spectro_dp\
+    --hop_length 50 \
+    --n_fft 100 \
+    --output_dir models/bciiv_mel_64 \
+    --train_batch_size 2 \
+    --num_epochs 100 \
+    --gradient_accumulation_steps 1 \
+    --learning_rate 1e-4 \
+    --lr_warmup_steps 500 \
+    --mixed_precision no \
+    --original_shape 22,32,64 \
+    --force_rescale 22,32,64 \
+```
+
 ```bash
 accelerate launch --config_file config/accelerate_local.yaml \
 scripts/train_unet.py \
@@ -73,7 +93,10 @@ scripts/train_unet.py \
     --gradient_accumulation_steps 1 \
     --learning_rate 1e-4 \
     --lr_warmup_steps 500 \
-    --mixed_precision no
+    --mixed_precision no \
+    --original_shape 22,24,64 \
+    --force_rescale 22,32,64 \
+    --stft
 ```
 If you want use wandb to log metrics on webiste first run init 
 ```bash
@@ -192,6 +215,28 @@ Here are examples of the visualization nearly end of the training, mainly includ
       --max_freq 64 \
       --original_shape 105,112,96 \
       --force_rescale 105,96,64 \
-      --mixed_precision fp16 \
+      --mixed_precision fp16 
   ```
+
+  ```sh
+  CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
+  scripts/train_unet_freq.py \
+      --dataset_name dataset/zuco/freqmap_32_840 \
+      --hop_length 50 \
+      --eeg_channels 1 \
+      --n_fft 100 \
+      --sample_rate 500 \
+      --output_dir models/zuco-freq_map \
+      --train_batch_size 2 \
+      --num_epochs 100 \
+      --gradient_accumulation_steps 1 \
+      --learning_rate 1e-4 \
+      --lr_warmup_steps 500 \
+      --max_freq 224 \
+      --original_shape 1,32,840 \
+      --force_rescale 1,32,840 \
+      --mixed_precision fp16 \
+      --debug
+  ```
+
 
