@@ -153,57 +153,50 @@ def visualize_feature_map_withtoken(feature_map, target_tokens):
     return pil_image
 
 
-def create_topo_heat_maps(feature_map, token_ids, channels_indices, skip_special_tokens=False):
-    # 频带名称
-    band_names = ['theta_1', 'theta_2', 'alpha_1', 'alpha_2', 'beta_1', 'beta_2', 'gamma_1', 'gamma_2']
-    
-    # 将token ID转换为文本
+def create_topo_heat_maps(feature_map, token_ids, channels_indices, skip_special_tokens=True):
+    # Band names
+    band_names = ['theta_1 (4–6 Hz)', 'theta_2 (6.5–8 Hz)', 'alpha_1 (8.5–10 Hz)', 'alpha_2 (10.5–13 Hz)', 'beta_1 (13.5–18 Hz)', 'beta_2 (18.5–30 Hz)', 'gamma_1 (30.5–40 Hz)', 'gamma_2 (40–49.5 Hz)']
+    print("token_ids", len(token_ids))
+    # Convert token IDs to text
     tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
     tokens = tokenizer.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
     
-    # 加载biosemi128布局
-    # layout = mne.channels.make_standard_montage('biosemi128')
-    # ch_names = layout.ch_names
-    
+    # Load biosemi128 layout
     montage = make_standard_montage('biosemi128')
     ch_names = montage.ch_names
-    # 选择需要的通道
+    # Select the required channels
     selected_ch_names = [ch_names[i] for i in channels_indices]
 
     ch_types = ['eeg'] * len(channels_indices)
     sfreq = 500  # Hz
     
     
-    # 创建包含56张PIL Image的列表
+    # Create a list of 56 PIL Images
     images = []
     
-    # 遍历所有时刻
+    # Iterate through all time points
     for i in range(len(tokens)):
         fig, axes = plt.subplots(1, 8, figsize=(16, 2))
         canvas = FigureCanvas(fig)
         
-        # 遍历所有频带
+        # Iterate through all bands
         for j, band_name in enumerate(band_names):
-            # 创建一个包含105个通道的空info对象
+            # Create an empty info object with 105 channels
             info = create_info(ch_names=selected_ch_names, ch_types=ch_types, sfreq=sfreq)
-            # 提取特定时刻和频带的EEG数据
+            # Extract EEG data for a specific time point and band
             eeg_data = feature_map[j, :, i]
-            # print(len(channels_indices))
-            # print(np.array([[eeg_data],[eeg_data]]).transpose(0,2,1).shape)
-            # 创建Epochs数据
+            # Create Epochs data
             info.set_montage(montage)
             epochs = mne.EpochsArray(np.array([[eeg_data],[eeg_data]]).transpose(0,2,1), info)
             
-            # 绘制脑区拓扑地形图
+            # Plot the brain area topographic map
             im, _ = mne.viz.plot_topomap(eeg_data, epochs.info, axes=axes[j], show=False)
             axes[j].set_title(f"{band_name}")
         
-        # 添加文本
-        # print(i)
-        # print(tokens[i])
+        # Add text
         plt.suptitle(f"Token: {tokens[i]}", fontsize=14, y=1)
         
-        # 将绘制的图像保存为PIL Image
+        # Save the plotted image as a PIL Image
         plt.tight_layout()
 
         # Draw the plot to the canvas buffer
@@ -219,23 +212,34 @@ def create_topo_heat_maps(feature_map, token_ids, channels_indices, skip_special
 
 
 def stack_topomaps(heat_map_images, file_nmae='merged_image.png'):
-    # 计算总的高度
     total_height = sum([img.height for img in heat_map_images])
-
-    # 创建一个新的空白图像，其宽度等于第一张图像的宽度，高度等于所有图像的总高度
     merged_image = Image.new('RGB', (heat_map_images[0].width, total_height))
-
-    # 纵向拼接图像
     y_offset = 0
     for img in heat_map_images:
         merged_image.paste(img, (0, y_offset))
         y_offset += img.height
 
-    # 显示拼接后的图像
-    # merged_image.show()
-
-    # 如果需要保存拼接后的图像
     merged_image.save(file_nmae)
+
+
+def normalize_feature_map(feature_map, min_val=-8, max_val=10):
+    """
+    Normalize the values in the input feature_map to the range [min_val, max_val].
+
+    :param feature_map: A numpy array of shape (8, 105, 56)
+    :param min_val: The minimum value of the normalization range, default is -10
+    :param max_val: The maximum value of the normalization range, default is 10
+    :return: The normalized feature_map
+    """
+    # Calculate the minimum and maximum values of the input array
+    input_min = np.min(feature_map)
+    input_max = np.max(feature_map)
+
+    # Normalize the array to the range [min_val, max_val]
+    normalized_feature_map = (feature_map - input_min) * (max_val - min_val) / (input_max - input_min) + min_val
+
+    return normalized_feature_map
+
 
 
 if __name__ == '__main__':
@@ -266,6 +270,8 @@ if __name__ == '__main__':
     channels_indices = np.random.choice(range(128), 105, replace=False)
 
     # 调用函数
+    feature_map = normalize_feature_map(feature_map)
     heat_map_images = create_topo_heat_maps(feature_map, token_ids, channels_indices)
     heat_map_images[0].save('test.png')
     stack_topomaps(heat_map_images)
+    

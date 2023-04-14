@@ -28,7 +28,7 @@ from diffusers.utils import BaseOutput
 from PIL import Image
 
 from braindiffusion.utils.wave_spectron import Spectro, Spectro_STFT
-from braindiffusion.utils.mne_visualize import visualize_eeg1020, visualize_eeg128, visualize_feature_map, visualize_feature_map_withtoken, create_topo_heat_maps, stack_topomaps
+from braindiffusion.utils.mne_visualize import visualize_eeg1020, visualize_eeg128, visualize_feature_map, visualize_feature_map_withtoken, create_topo_heat_maps, stack_topomaps, normalize_feature_map
 from braindiffusion.utils.sampling_func import *
 
 
@@ -203,7 +203,8 @@ class WaveDiffusionPipeline(DiffusionPipeline):
             images = 1 / 0.18215 * images
             images = self.vqvae.decode(images)["sample"]
 
-        images = (images / 2 + 0.5).clamp(0, 1) # 2,22,32,64
+        # images = (images / 2 + 0.5).clamp(0, 1) # 2,22,32,64
+        images = (images / 2 + 0.5)
         images = images.cpu().numpy()
         # channels = images.shape[1]
         # images = (images * 255).round().astype("uint8")
@@ -224,6 +225,7 @@ class WaveDiffusionPipeline(DiffusionPipeline):
                 spec_images.append(temp_img)
         channels_indices = np.random.choice(range(128), 105, replace=False)
         for index, featuremap in enumerate(images):
+            featuremap = normalize_feature_map(featuremap)
             topolist = create_topo_heat_maps(featuremap, target_ids[index] , channels_indices)
             topoimages.append(topolist)
 

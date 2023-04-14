@@ -112,7 +112,7 @@ def main(args):
 
         augmentations = Compose([
             lambda x: np.frombuffer(x, dtype=np.float64).reshape(args.original_shape)[:,:,:max_freq].transpose().transpose(1,0,2).astype(np.float32), # convert bytes to numpy original 
-            lambda x: np.abs(x), # resize to original
+            # lambda x: np.abs(x), # resize to original
             # lambda x: print(x.shape), # resize to original
             ToTensor(),
             Normalize([0.5], [0.5]).float(),
@@ -129,7 +129,7 @@ def main(args):
         if args.encodings is not None:
             encoding = [encodings[str(target_ids)][:int(resolution[1]),:] for target_ids in examples["target_ids"]]
             
-            return {"input": images, "encoding": encoding, "target_ids": examples["target_ids"]}
+            return {"input": images, "encoding": encoding, "target_ids": examples["target_ids"][:args.max_freq]}
         return {"input": images}
 
     dataset.set_transform(transforms)
@@ -408,7 +408,7 @@ def main(args):
                     encoding = torch.stack(encoding).to(
                                           clean_images.device)
                     # print(encoding.shape)
-                    target_ids = [eval(key) for key in target_ids]
+                    target_ids = [eval(key)[:args.max_freq] for key in target_ids]
                         
                 else:
                     encoding = None
@@ -469,7 +469,7 @@ if __name__ == "__main__":
     parser.add_argument("--eval_batch_size", type=int, default=1)
     parser.add_argument("--num_epochs", type=int, default=100)
     parser.add_argument("--save_images_epochs", type=int, default=1)
-    parser.add_argument("--save_model_epochs", type=int, default=10)
+    parser.add_argument("--save_model_epochs", type=int, default=5)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--lr_scheduler", type=str, default="cosine")
@@ -491,7 +491,7 @@ if __name__ == "__main__":
     parser.add_argument("--visualization_dir", type=str, default="visualizations")
     parser.add_argument("--original_shape", type=str, default="8,105,56")
     parser.add_argument("--force_rescale", type=str, default="8,105,56")
-    parser.add_argument("--max_freq", type=int, default=105)
+    parser.add_argument("--max_freq", type=int, default=32)
     parser.add_argument("--debug", action="store_true")
     # parser.add_argument("--debug", type=bool, default=True)
     parser.add_argument("--save_image_tensorboard", type=bool, default=False)
