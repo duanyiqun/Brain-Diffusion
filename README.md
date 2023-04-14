@@ -247,8 +247,8 @@ Here are examples of the visualization nearly end of the training, mainly includ
       --eeg_channels 8 \
       --n_fft 100 \
       --sample_rate 500 \
-      --output_dir models/zuco-freq_map_810556_rescale \
-      --train_batch_size 2 \
+      --output_dir models/zuco-freq_map_810556_nora \
+      --train_batch_size 3 \
       --num_epochs 100 \
       --gradient_accumulation_steps 1 \
       --learning_rate 1e-4 \

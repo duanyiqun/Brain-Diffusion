@@ -125,7 +125,7 @@ def visualize_feature_map_withtoken(feature_map, target_tokens):
 
     # Revert tokens to a sentence using BertTokenizer
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-    sentence = tokenizer.decode(target_tokens, skip_special_tokens=False)
+    sentence = tokenizer.decode(target_tokens, skip_special_tokens=True)
 
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(12, 7), gridspec_kw={'height_ratios': [4, 1]})
     canvas = FigureCanvas(fig)
