@@ -219,20 +219,20 @@ Here are examples of the visualization nearly end of the training, mainly includ
   ```
 
   ```sh
-  CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
+  CUDA_VISIBLE_DEVICES=0 accelerate launch --config_file config/accelerate_local.yaml \
   scripts/train_unet_freq.py \
       --dataset_name dataset/zuco/freqmap_32_840 \
       --hop_length 50 \
       --eeg_channels 1 \
       --n_fft 100 \
       --sample_rate 500 \
-      --output_dir models/zuco-freq_map \
+      --output_dir models/zuco-freq_map_32840 \
       --train_batch_size 2 \
       --num_epochs 100 \
       --gradient_accumulation_steps 1 \
       --learning_rate 1e-4 \
       --lr_warmup_steps 500 \
-      --max_freq 224 \
+      --max_freq 315 \
       --original_shape 1,32,840 \
       --force_rescale 1,32,840 \
       --mixed_precision fp16 \
