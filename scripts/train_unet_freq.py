@@ -105,12 +105,13 @@ def main(args):
         # resolution = (resolution[0], int(resolution[1]//1.2), int(resolution[2]//1.5))
         # resolution = dataset[0]["image"].height, dataset[0]["image"].width
         max_freq = args.max_freq
+        min_freq = args.min_freq
         # assert max_freq < args.original_shape[2]
         resolution = np.frombuffer(dataset[0]["image"], dtype=np.float64).reshape(args.original_shape).shape
         resolution = (resolution[0], int(resolution[1]), max_freq)
 
         augmentations = Compose([
-            lambda x: np.frombuffer(x, dtype=np.float64).reshape(args.original_shape)[:,:,:max_freq].transpose().transpose(1,0,2).astype(np.float32), # convert bytes to numpy original 
+            lambda x: np.frombuffer(x, dtype=np.float64).reshape(args.original_shape)[:,:,min_freq:max_freq+min_freq].transpose().transpose(1,0,2).astype(np.float32), # convert bytes to numpy original 
             lambda x: np.abs(x), # resize to original
             # lambda x: print(x.shape), # resize to original
             ToTensor(),
@@ -483,6 +484,7 @@ if __name__ == "__main__":
     parser.add_argument("--original_shape", type=str, default="1,32,840")
     parser.add_argument("--force_rescale", type=str, default="1,32,840")
     parser.add_argument("--max_freq", type=int, default=64)
+    parser.add_argument("--min_freq", type=int, default=0)
     parser.add_argument("--debug", action="store_true")
     # parser.add_argument("--debug", type=bool, default=True)
     parser.add_argument("--save_image_tensorboard", type=bool, default=False)

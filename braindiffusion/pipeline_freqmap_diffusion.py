@@ -227,9 +227,12 @@ class WaveDiffusionPipeline(DiffusionPipeline):
         # get from the zuco authors
         my_channels_indiceslist = [x for x in range(0, 128) if x+1 not in to_remove]
         for index, featuremap in enumerate(images):
-            featuremap = normalize_feature_map(featuremap)
-            topolist = create_topo_heat_maps(featuremap, target_ids[index] , my_channels_indiceslist, skip_special_tokens=True)
-            topoimages.append(topolist)
+            if featuremap.shape[0] == 8:
+                featuremap = normalize_feature_map(featuremap)
+                topolist = create_topo_heat_maps(featuremap, target_ids[index] , my_channels_indiceslist, skip_special_tokens=True)
+                topoimages.append(topolist)
+            else:
+                pass
 
         # for channel_index in range():
         

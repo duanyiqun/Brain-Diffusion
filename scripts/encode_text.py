@@ -87,6 +87,7 @@ def main(args):
             )
 
     encodings = {}
+    text_encoder.to("cuda")
     # for dataslice in tqdm(dataset.to_pandas()["audio_file"].unique()):
     for dataslice in tqdm(dataset):
         seq_len = dataslice["seq_len"]
@@ -102,17 +103,18 @@ def main(args):
 
         target_ids_batch = target_ids_t.unsqueeze(0)
         input_masks_batch = input_masks_t.unsqueeze(0)
-
+        target_ids_batch = target_ids_batch.to("cuda")
+        input_masks_batch = input_masks_batch.to("cuda")
         output = text_encoder(input_ids = target_ids_batch, attention_mask = input_masks_batch)    
         # print(output)
         # print(output.last_hidden_state.squeeze().shape)
-        encodings[str(target_ids)] = output.last_hidden_state.squeeze()
+        encodings[str(target_ids)] = output.last_hidden_state.detach().cpu().squeeze()
     pickle.dump(encodings, open(args.output_file, "wb"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create pickled audio encodings for dataset of audio files.")
-    parser.add_argument("--dataset_name", type=str, default="./dataset/zuco/spectro_dp")
+    parser.add_argument("--dataset_name", type=str, default="/projects/CIBCIGroup/00DataUploading/yiqun/bci_ddpm/Brain-Diffusion/dataset/zuco/freqmap_8_105_56")
     parser.add_argument("--output_file", type=str, default="dataset/zuco/spectro_dp/text_encodings_train.pt")
     parser.add_argument("--use_auth_token", type=bool, default=False)
     args = parser.parse_args()

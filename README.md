@@ -1,22 +1,23 @@
 <div align="center">
 
 
-# Diffusion Models for Brain Waves
+# Synthesizing Brain Waves with Text
 **A Diffusion Framework for Dynamics/EEG Signals Synthesizing or Denoising**
 
 ______________________________________________________________________
 
-WIP ...
-
  [![python](https://img.shields.io/badge/python-%20%203.9-blue.svg)]()
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/duanyiqun/DiffusionDepth/blob/main/LICENSE)
+
+
+![](visualization/topomap_images%3A1_0.gif)
 
 </div> 
 
 
+While existing research has explored translating EEG waves into comprehensible language, the reverse - synthesizing brain waves from textual inputs - remains largely unexplored. The intuition is simple yet interesting, just translating text into brain waves. We are trying to simulate brain dynamics by introducing stable diffusion-formation model into brain waves. 
 
-
-
+However, unlike the images, we can't intuitively perception the resonality of the generative quality by human instinction. So currently, this is just an open-demo for fun discussions. There has not been any quantitative evaluation yet.
 ______________________________________________________________________
   
 
@@ -39,25 +40,72 @@ pip instlal -r requirements.txt
 
 <div align="left">
 
-## Base Diffusion (BCI-IV Dataset)
+## Synthesizing Methods
+
+There are multiple ways to analyze the synthesizing brain waves, we provide a simple mindmap to show the difference between them.
 
 </div>
 
-## Data Preparation
+<div align="center">
+<img src="visualization/braindiffusion.png" width = "600" height = "" alt="图片名称" align=center  />
+</div>
 
-Download the BCI-IV data under the dataset folder (apply for liscence). The data is from [here](https://www.bbci.de/competition/iv/#dataset2). The data should be preprossed in .mat format. We provide example file of a single subject. 
+- **STFT Spectrogram** is the most common way to analyze the brain waves. This way is easier to observe spectrogram in natural bands (alpha, beta, gamma...)
+- **Mel Spectrogram** is a way more similar to the way human perceive the sound, however we adjust the frequency to adpat much lower sampling rate of brain waves.
+- **Raw Waves** is the most intuitive way to observe the brain waves, however it is hard to observe the resonality of the generative quality by human instinction.
+- **Frequency Features** is fast to validate whether the diffusion works normaly( or not having bugs.)
 
-This step convert the EEG waves into spectro latent and create a dataset for accelerate the training. This convertion is inspired by in audio conversion. To accelerate the conversion we use the mel spectro from audio area. 
+
+We implemente naive demo for all four approaches. As basically we want raw waves as the final output, for STFT and Mel Sepctrogram, we use the inverse transform to convert back to raw waves. For frequency features, it just used for observing the resonality.
+
+
+### Short List:
+
+- [x] **STFT Spectrogram**
+- [x] **Mel Spectrogram**
+- [x] **Raw Waves**
+
+</div>
+
+## Data
+
+We use two datasets for training and testing. 
+
+- BCI-IV dataset: which is a public Motor Imaginary Dataset with 4 classes. We use the dataset to train the unconditional diffusion model.
+- ZuCo dataset: which is a public dataset for neural natural language reading. We use the dataset to train the conditional diffusion model. The aim is to reconstruct the brain dynamics from the text.
+
+Please refer to the [Docs for Data Preparation](docs/DATA.md) to excute preprocessing and data preparation.
+Both the dataset will be transfered to huggingface dataset format. The dataset will be saved in ```dataset/bci_iv``` and ```dataset/zuco```. The structure would be like:
 
 ```sh
-python scripts/wave2spectro.py \
-        --resolution 31,64 \
-        --hop_length 50 \
-        --input_dir path-to-mat-files \
-        --output_dir path-to-output-data
+.
+├── bci_iv
+│   ├── spectro_dp
+│   │   ├── test
+│   │   └── train
+│   └── stft_64-28
+│       ├── test
+│       └── train
+└── zuco
+    ├── freqmap_8_105_56
+    │   ├── dataset_dict.json
+    │   └── train
+    ├── spectro_dp (mel spectrogram)
+    │   ├── dev
+    │   ├── test
+    │   ├── text_encodings_train.pt
+    │   └── train
+    └── stft-96-64
+        ├── dataset_dict.json
+        ├── dev
+        ├── test
+        └── train
 ```
- 
+To be decided: 
+- [ ] Upload the dataset to HuggingFace Dataset.
 
+
+## Base Diffusion (BCI-IV Dataset)
 ## Training
 
 
@@ -226,18 +274,20 @@ Here are examples of the visualization nearly end of the training, mainly includ
       --eeg_channels 1 \
       --n_fft 100 \
       --sample_rate 500 \
-      --output_dir models/zuco-freq_map_32840 \
+      --output_dir models/zuco-freq_map_32_420-630 \
       --train_batch_size 2 \
       --num_epochs 100 \
       --gradient_accumulation_steps 1 \
       --learning_rate 1e-4 \
       --lr_warmup_steps 500 \
-      --max_freq 315 \
+      --max_freq 420 \
+      --min_freq 630 \
       --original_shape 1,32,840 \
       --force_rescale 1,32,840 \
       --mixed_precision fp16 \
       --debug
   ```
+#### Training on ZuCo with frequency map 8,105,56
 
   ```sh
   CUDA_VISIBLE_DEVICES=1 accelerate launch --config_file config/accelerate_local.yaml \
@@ -259,6 +309,5 @@ Here are examples of the visualization nearly end of the training, mainly includ
       --mixed_precision fp16 \
       --debug
   ```
-
-
-
+  
+  
