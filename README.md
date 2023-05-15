@@ -258,24 +258,18 @@ scripts/train_unet_freq.py \
 The biggest problem is the time segments. Given a text, the feature lenggth should be approaximately consistency with the text length. 
 We can observe that the consistency becomes better through the training process. Below we show the comparison between the feature map after epoch 9 and the feature map after 99. However, the generated feature length is is still lower than expected. Also the generated clearity of the feature map decreases and tend to be averaged.
 
+Left is the feature map after epoch 9, right is the feature map after epoch 99.
+
 <div align="center">
-    <div style="display: inline-block;">
-        <figure>
-            <img style="border-radius: 0.3125em;
+<img style="border-radius: 0.3125em;
             box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  
-            src=./visualization/freqimg/featuremap_images:9_bs0.png width = "300" alt="图片名称" align=center />
-            <figcaption> Visualization after Epoch 9</figcaption>
-        </figure>
-    </div>
-    <div style="display: inline-block;">
-        <figure>
-            <img style="border-radius: 0.3125em;
+            src=./visualization/freqimg/featuremap_images:9_bs0.png width = "400" alt="图片名称" align=center />
+<img style="border-radius: 0.3125em;
             box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  
-            src=./visualization/freqimg/featuremap_images:99_bs0.png width = "300" alt="图片名称" align=center />
-            <figcaption>Visualization after Epoch 99</figcaption>
-        </figure>
-    </div>
+            src=./visualization/freqimg/featuremap_images:99_bs0.png width = "400" alt="图片名称" align=center />
+</br>
 </div>
+
 Limited to space I only show feature 0-420 out of 840 dimension of the features. 
 
 #### Frequency features with feature map 8, 105, 56
@@ -301,10 +295,3 @@ scripts/train_unet_freq_2d.py \
     --debug
 ```
   
-If we expand the topomap into static map as below. 
-
-<div align="center">
-<img style="border-radius: 0.3125em;
-    box-shadow: 0 2px 4px 0 rgba(34,36,38,.12),0 2px 10px 0 rgba(34,36,38,.08);"  src=./visualization/topomap_images:1_0.png width = "800" alt="图片名称" align=center />
-</br>
-</div>
