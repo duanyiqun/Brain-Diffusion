@@ -1,7 +1,8 @@
+
 import os
 import numpy as np
 import h5py
-import data_loading_helpers_modified as dh
+import data_loading_helpers as dh
 from glob import glob
 from tqdm import tqdm
 import pickle
@@ -58,11 +59,13 @@ for file in tqdm(os.listdir(rootdir)):
             # print('contentData shape:', contentData.shape, 'dtype:', contentData.dtype)
             omissionR = sentence_data['omissionRate']
             wordData = sentence_data['word']
+            # print('wordData shape:', wordData.shape, 'dtype:', wordData.dtype)
 
 
             for idx in range(len(rawData)):
                 # get sentence string
                 obj_reference_content = contentData[idx][0]
+                # print('obj_reference_content:', f[obj_reference_content])
                 sent_string = dh.load_matlab_string(f[obj_reference_content])
                 # print('sentence string:', sent_string)
                 
@@ -74,7 +77,7 @@ for file in tqdm(os.listdir(rootdir)):
                 }
                 # print(sent_obj)
                 sent_obj['word'] = []
-
+                # print(f[wordData[idx][0]])
                 # get word level data
                 word_data, word_tokens_all, word_tokens_has_fixation, word_tokens_with_mask = dh.extract_word_level_data(f, f[wordData[idx][0]])
                 
